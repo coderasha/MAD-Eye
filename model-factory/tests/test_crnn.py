@@ -4,7 +4,7 @@ torch = pytest.importorskip("torch")
 
 from training.architectures.crnn import PrintedCrnn, ctc_loss, greedy_decode
 from training.charsets.english import ENGLISH_CHARSET, charset_size, decode_indices, encode_text
-from training.train_printed import smoke_train
+from training.train_printed import _fit, _predict, smoke_train
 
 
 def test_forward_and_greedy_decode() -> None:
@@ -34,6 +34,16 @@ def test_ctc_loss_is_finite() -> None:
     lengths = torch.tensor([2, 1], dtype=torch.long)
     loss = ctc_loss(logits, targets, lengths)
     assert torch.isfinite(loss)
+
+
+def test_tight_lines_can_overfit_two_glyphs() -> None:
+    torch.manual_seed(0)
+    charset = "ab"
+    model = PrintedCrnn(charset_size(charset))
+    device = torch.device("cpu")
+    _fit(model, ["a", "b", "ab"], charset, 40, device)
+    assert _predict(model, "a", charset, device) == "a"
+    assert _predict(model, "b", charset, device) == "b"
 
 
 def test_smoke_checkpoint_is_not_a_benchmark(tmp_path) -> None:

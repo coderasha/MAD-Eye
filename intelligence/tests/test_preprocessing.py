@@ -46,10 +46,22 @@ def test_clean_page_skips_denoise_and_deskew() -> None:
     assert result.plan is not None
     assert "denoise" in result.plan.skipped
     assert "deskew" in result.plan.skipped
+    assert "contrast" in result.plan.skipped
+    assert "low_contrast" not in result.quality.degradation_flags
     assert result.provenance.benchmark_validated is False
     assert result.provenance.model_code is None
     assert result.quality is not None
     assert result.quality.upside_down_resolved is False
+
+
+def test_faint_ink_plans_contrast() -> None:
+    image = np.full((160, 240), 190, dtype=np.uint8)
+    image[40:48, 30:180] = 170
+    result = process_page(image, PreprocessOptions())
+    assert result.plan is not None
+    assert "contrast" in result.plan.operations
+    assert result.quality is not None
+    assert "low_contrast" in result.quality.degradation_flags
 
 
 def test_skewed_page_plans_deskew() -> None:

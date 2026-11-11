@@ -19,9 +19,12 @@ Status vocabulary used in this repository:
 | Upload, magic-byte checks, MinIO, clamav hook | Implemented |
 | Preprocess jobs, worker, page-level failure isolation | Implemented |
 | Adaptive preprocessing and page rendering | Implemented |
-| ME-04 training and CER/WER harness | Implemented as a framework, not as a trained model |
-| Product UI for the paths above | Implemented against the API |
-| Recognition, layout, tables, extraction, handwriting | Not implemented |
+| ME-04 training and CER/WER harness | Implemented. A synthetic bitmap run can be exported. It is not benchmark-validated |
+| Product UI for the paths above | Implemented against the API, including recognition review |
+| Printed recognition | Implemented when a checksummed manifest is set. Unvalidated output is capped at NEEDS_REVIEW |
+| Text-line detection and ruled tables | Implemented as classical geometry. Not benchmark-validated |
+| Label extraction | Implemented as a search over recognised lines. Missing labels are omitted |
+| Layout classification, handwriting | Not implemented |
 | Offline installation bundle | Not implemented |
 | Accuracy targets in section 19 of the product brief | Not measured |
 
@@ -33,7 +36,7 @@ Status vocabulary used in this repository:
 4. Evaluate once on the held-out split. Record CER, WER, latency, and sample counts in the model registry.
 5. Export ONNX, fill `weightsSha256`, and load it through `runtime/onnx_runtime.py`.
 6. Persist `recognition_regions` with model id, version, raw confidence, and `calibrated: false` until a calibration map exists.
-7. Only then wire `POST /v1/recognise`.
+7. `POST /v1/recognise` already runs this path. A checkpoint stays unvalidated until the held-out measurement is recorded.
 
 Do not import a pretrained public OCR checkpoint and rename it.
 
@@ -59,5 +62,5 @@ TLS termination, backup and restore test, offline bundle, SMTP, Redis-backed mul
 - `pnpm test` passes.
 - `docker compose up` starts the data services, API, worker, and intelligence service.
 - A PDF or image can be uploaded, preprocessed, and viewed without any invented text.
-- `POST /v1/recognise` returns 501.
+- `POST /v1/recognise` returns 501 when no manifest is configured.
 - Evaluation of identical strings reports CER 0 and `benchmarkValidated` false.

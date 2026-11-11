@@ -15,6 +15,9 @@ def test_exported_graph_accepts_the_inference_shape(tmp_path: Path) -> None:
     session = ort.InferenceSession(output.read_bytes(), providers=["CPUExecutionProvider"])
     import numpy as np
 
-    logits = session.run(None, {"images": np.zeros((1, 1, 32, 512), dtype=np.float32)})[0]
-    assert logits.shape[0] == 1
-    assert logits.shape[2] == charset_size(charset)
+    narrow = session.run(None, {"images": np.zeros((1, 1, 32, 64), dtype=np.float32)})[0]
+    wide = session.run(None, {"images": np.zeros((1, 1, 32, 512), dtype=np.float32)})[0]
+    assert narrow.shape[0] == 1
+    assert narrow.shape[2] == charset_size(charset)
+    assert wide.shape[2] == charset_size(charset)
+    assert wide.shape[1] > narrow.shape[1]

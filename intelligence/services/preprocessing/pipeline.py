@@ -62,7 +62,7 @@ def assess(gray: np.ndarray, dpi: float | None) -> QualityReport:
         flags.append("blur")
     if nlevel == "high":
         flags.append("noise")
-    if contrast < quality.CONTRAST_LOW:
+    if quality.ink_separation(gray) < quality.INK_SEPARATION_LOW:
         flags.append("low_contrast")
     if shadow >= quality.SHADOW_HIGH:
         flags.append("shadow")
@@ -120,12 +120,12 @@ def build_plan(report: QualityReport, options: PreprocessOptions, scale: float) 
     else:
         skipped.append("denoise")
         reasons["denoise"] = "noise below the action threshold"
-    if report.contrast_std < quality.CONTRAST_LOW:
+    if "low_contrast" in report.degradation_flags:
         operations_run.append("contrast")
-        reasons["contrast"] = "global contrast is low"
+        reasons["contrast"] = "ink is faint relative to the paper"
     else:
         skipped.append("contrast")
-        reasons["contrast"] = "contrast is adequate"
+        reasons["contrast"] = "ink is already separated from the paper"
     if options.allow_experimental_deblur and report.blur_level == "blurry":
         operations_run.append("experimental_unsharp")
         reasons["experimental_unsharp"] = "explicitly requested; classical unsharp mask, not a generative restoration"

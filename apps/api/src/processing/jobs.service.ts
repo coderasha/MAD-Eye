@@ -89,8 +89,11 @@ export class JobsService {
   async requeue(tenantId: string, jobId: string) {
     const job = await this.prisma.tenant(tenantId, (tx) => tx.processingJob.findFirst({ where: { id: jobId, tenantId } }));
     if (!job) throw new NotFoundException({ code: "NOT_FOUND", message: "Job not found" });
-    if (job.status !== "PENDING" && job.status !== "FAILED") {
-      throw new ConflictException({ code: "JOB_NOT_REQUEUABLE", message: "Only pending or failed jobs can be requeued" });
+    if (job.status !== "PENDING" && job.status !== "QUEUED" && job.status !== "FAILED") {
+      throw new ConflictException({
+        code: "JOB_NOT_REQUEUABLE",
+        message: "Only pending, queued, or failed jobs can be requeued",
+      });
     }
     const message: JobMessage = {
       jobId: job.id,
@@ -100,10 +103,18 @@ export class JobsService {
       correlationId: job.correlationId,
     };
     await this.queue.publish(message);
-    const queued = await this.prisma.tenant(tenantId, (tx) =>
-      tx.processingJob.update({ where: { id: job.id }, data: { status: "QUEUED", errorCode: null, errorMessage: null } }),
+    const updated = await this.prisma.tenant(tenantId, (tx) =>
+      tx.processingJob.updateMany({
+        where: { id: job.id, tenantId, status: { in: ["PENDING", "QUEUED", "FAILED"] } },
+        data: { status: "QUEUED", errorCode: null, errorMessage: null },
+      }),
     );
-    return this.present(queued);
+    if (updated.count === 0) {
+      const current = await this.prisma.tenant(tenantId, (tx) => tx.processingJob.findFirst({ where: { id: job.id, tenantId } }));
+      if (!current) throw new NotFoundException({ code: "NOT_FOUND", message: "Job not found" });
+      return this.present(current);
+    }
+    return this.present({ ...job, status: "QUEUED", errorCode: null });
   }
 
   private present(job: { id: string; documentId: string; pipeline: string; status: string; errorCode: string | null; createdAt: Date; finishedAt: Date | null }) {

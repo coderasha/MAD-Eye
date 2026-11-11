@@ -1,22 +1,24 @@
 # MAD-EYE
 
-Proprietary OCR and document-intelligence platform. Phase 1 is the platform foundation, adaptive classical preprocessing, and the ME-04 training and evaluation framework.
+Proprietary OCR and document-intelligence platform. The running path is account management, adaptive classical preprocessing, classical line and ruled-table geometry, and ME-04 printed recognition when a checksummed ONNX manifest is configured.
 
-Recognition weights are not registered. The product does not call a third-party OCR engine and it does not invent text.
+The product does not call a third-party OCR engine and it does not invent text. A synthetic bitmap checkpoint is not a measured document accuracy.
 
 ## What works
 
 - Organisation accounts, cookie sessions, roles, and hashed API keys.
 - Document upload to MinIO after a magic-byte check. Originals are kept.
-- Preprocess jobs through RabbitMQ. Each page is independent.
-- OpenCV quality measurement and an adaptive preprocessing plan.
-- ME-04 CNN + BiLSTM + CTC training code, greedy CTC decode, and CER/WER measurement. Reports cannot mark themselves benchmark-validated.
-- ONNX loading that refuses a missing file or a bad checksum.
+- Preprocess and recognise jobs through RabbitMQ. Each page is independent.
+- OpenCV quality measurement and an adaptive preprocessing plan. Contrast enhancement runs when the ink is faint, not merely because the page is mostly white.
+- Classical text-line boxes and ruled-table geometry. Unruled pages produce no table.
+- ME-04 CNN + BiLSTM + CTC training, ONNX export, greedy CTC decode, and CER/WER measurement. Reports cannot mark themselves benchmark-validated.
+- ONNX loading that refuses a missing file or a bad checksum. Without a manifest, recognition returns no text.
+- Review corrections stored beside the original region text.
 
 ## What does not work yet
 
-- Text detection, printed recognition inference, handwriting, layout, tables, classification, and field extraction.
-- Hindi and Odia models.
+- A model trained on real documents, and any held-out document accuracy.
+- Hindi and Odia models, handwriting, layout classification, and document classification.
 - Email delivery for password reset.
 - Offline installation bundles and Kubernetes.
 - The accuracy targets in the product brief. They have not been measured.

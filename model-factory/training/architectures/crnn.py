@@ -47,6 +47,10 @@ class PrintedCrnn(nn.Module):
             batch_first=True,
         )
         self.classifier = nn.Linear(512, num_classes)
+        # A zero bias lets the blank class win every timestep. CTC then stops
+        # emitting characters. This value is only the initial condition.
+        nn.init.zeros_(self.classifier.bias)
+        self.classifier.bias.data[0] = -2.0
 
     def forward(self, images: torch.Tensor) -> torch.Tensor:
         """Return logits shaped (batch, time, classes) for a (batch, 1, 32, width) tensor."""

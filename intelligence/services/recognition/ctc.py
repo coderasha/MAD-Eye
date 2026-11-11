@@ -6,23 +6,30 @@ import cv2
 import numpy as np
 
 LINE_HEIGHT = 32
-LINE_WIDTH = 512
+MAX_LINE_WIDTH = 1024
 
 
-def prepare_line(image: np.ndarray, width: int = LINE_WIDTH) -> np.ndarray:
+def prepare_line(image: np.ndarray, width: int | None = None) -> np.ndarray:
+    """Scale a line crop to the training height and keep its own width.
+
+    Width is rounded up to a multiple of 4, which is the network's width
+    downsampling. A fixed wide canvas is not added.
+    """
     gray = image if image.ndim == 2 else cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     if gray.size == 0:
         gray = np.full((LINE_HEIGHT, 8), 255, dtype=np.uint8)
     scale = LINE_HEIGHT / max(1, gray.shape[0])
     resized_width = max(1, int(round(gray.shape[1] * scale)))
     resized = cv2.resize(gray, (resized_width, LINE_HEIGHT), interpolation=cv2.INTER_AREA)
-    if resized_width > width:
-        resized = cv2.resize(resized, (width, LINE_HEIGHT), interpolation=cv2.INTER_AREA)
-        resized_width = width
-    canvas = np.full((LINE_HEIGHT, width), 255, dtype=np.uint8)
+    limit = width if width is not None else min(MAX_LINE_WIDTH, max(8, resized_width))
+    limit += (4 - limit % 4) % 4
+    if resized_width > limit:
+        resized = cv2.resize(resized, (limit, LINE_HEIGHT), interpolation=cv2.INTER_AREA)
+        resized_width = limit
+    canvas = np.full((LINE_HEIGHT, limit), 255, dtype=np.uint8)
     canvas[:, :resized_width] = resized
     tensor = canvas.astype(np.float32) / 255.0
-    return tensor.reshape(1, 1, LINE_HEIGHT, width)
+    return tensor.reshape(1, 1, LINE_HEIGHT, limit)
 
 
 def greedy_decode(logits: np.ndarray) -> tuple[list[int], float]:

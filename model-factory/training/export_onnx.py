@@ -1,7 +1,7 @@
-"""Export a trained PrintedCrnn to a fixed-shape ONNX file.
+"""Export a trained PrintedCrnn to ONNX.
 
-The intelligence service loads this file with ONNX Runtime. Export does not
-mark the checkpoint as benchmark-validated.
+Width is dynamic so a short line is not padded out to a fixed canvas. Export
+does not mark the checkpoint as benchmark-validated.
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ def export_printed_onnx(model: PrintedCrnn, output: Path, width: int = 512) -> N
         str(output),
         input_names=["images"],
         output_names=["logits"],
+        dynamic_axes={"images": {3: "width"}, "logits": {1: "time"}},
         opset_version=17,
         dynamo=False,
     )

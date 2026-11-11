@@ -14,6 +14,7 @@ BLUR_SHARP = 300.0
 NOISE_MEDIUM = 3.0
 NOISE_HIGH = 8.0
 CONTRAST_LOW = 35.0
+INK_SEPARATION_LOW = 40.0
 SHADOW_HIGH = 18.0
 SKEW_ACT_DEGREES = 0.75
 MIN_DIMENSION_ADEQUATE = 800
@@ -59,6 +60,22 @@ def noise_level(score: float) -> str:
 
 def contrast_std(gray: np.ndarray) -> float:
     return float(gray.std())
+
+
+def ink_separation(gray: np.ndarray) -> float:
+    """Gap between the paper and the darkest ink.
+
+    Global standard deviation is small on a mostly white page even when the
+    strokes are black. That gap is what decides whether contrast enhancement
+    is useful.
+    """
+    flat = gray.astype(np.float32).ravel()
+    if flat.size == 0:
+        return 0.0
+    paper = float(np.percentile(flat, 90))
+    count = max(1, int(flat.size * 0.002))
+    darkest = float(np.partition(flat, count - 1)[:count].mean())
+    return paper - darkest
 
 
 def shadow_score(gray: np.ndarray) -> float:

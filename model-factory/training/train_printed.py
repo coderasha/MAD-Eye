@@ -31,7 +31,7 @@ def prepare_batch(texts: list[str], charset: str, device: torch.device) -> tuple
         width = max(width, array.shape[1])
         images.append(array)
         target_lists.append(encode_text(text, charset))
-    width = max(512, width)
+    width += (4 - width % 4) % 4
     batched = torch.ones((len(images), 1, 32, width), dtype=torch.float32)
     for index, array in enumerate(images):
         tensor = torch.from_numpy(np.array(array, copy=True)).float() / 255.0
