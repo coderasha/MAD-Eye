@@ -25,7 +25,7 @@ def detect_lines(image: np.ndarray) -> list[dict[str, int | float]]:
     boxes: list[dict[str, int | float]] = []
     for contour in contours:
         x, y, box_width, box_height = cv2.boundingRect(contour)
-        if box_height < 8 or box_width < 8:
+        if box_height < 6 or box_width < 6:
             continue
         if box_height > height * 0.6 and box_width > width * 0.85:
             continue

@@ -3,7 +3,7 @@ from PIL import Image, ImageDraw
 
 from services.detection.lines import detect_lines
 from services.extraction.labels import extract_labelled_values
-from services.recognition.ctc import decode_charset, greedy_decode
+from services.recognition.ctc import decode_charset, greedy_decode, prepare_line
 from services.tables.ruled import detect_ruled_tables
 
 
@@ -13,6 +13,17 @@ def test_line_detector_finds_a_drawn_stroke() -> None:
     boxes = detect_lines(image)
     assert boxes
     assert any(box["width"] > 40 and box["height"] > 8 for box in boxes)
+
+
+def test_line_tensor_keeps_the_crop_width() -> None:
+    image = np.full((40, 20), 255, dtype=np.uint8)
+    image[8:32, 4:16] = 0
+    tensor = prepare_line(image)
+    assert tensor.shape[0] == 1
+    assert tensor.shape[1] == 1
+    assert tensor.shape[2] == 32
+    assert tensor.shape[3] % 4 == 0
+    assert tensor.shape[3] < 512
 
 
 def test_blank_page_has_no_lines() -> None:

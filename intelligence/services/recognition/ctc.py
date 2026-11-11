@@ -18,6 +18,7 @@ def prepare_line(image: np.ndarray, width: int | None = None) -> np.ndarray:
     gray = image if image.ndim == 2 else cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     if gray.size == 0:
         gray = np.full((LINE_HEIGHT, 8), 255, dtype=np.uint8)
+    gray = _crop_to_ink(gray)
     scale = LINE_HEIGHT / max(1, gray.shape[0])
     resized_width = max(1, int(round(gray.shape[1] * scale)))
     resized = cv2.resize(gray, (resized_width, LINE_HEIGHT), interpolation=cv2.INTER_AREA)
@@ -30,6 +31,23 @@ def prepare_line(image: np.ndarray, width: int | None = None) -> np.ndarray:
     canvas[:, :resized_width] = resized
     tensor = canvas.astype(np.float32) / 255.0
     return tensor.reshape(1, 1, LINE_HEIGHT, limit)
+
+
+def _crop_to_ink(gray: np.ndarray) -> np.ndarray:
+    """Drop the paper around a line so the strokes fill the network height.
+
+    Training glyphs are scaled from their ink bounds. A detector box with a
+    margin would otherwise shrink those strokes.
+    """
+    if float(gray.std()) < 1.0:
+        return gray
+    _threshold, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    ink = np.argwhere(binary > 0)
+    if ink.size == 0:
+        return gray
+    y0, x0 = ink.min(axis=0)
+    y1, x1 = ink.max(axis=0) + 1
+    return gray[int(y0) : int(y1), int(x0) : int(x1)]
 
 
 def greedy_decode(logits: np.ndarray) -> tuple[list[int], float]:

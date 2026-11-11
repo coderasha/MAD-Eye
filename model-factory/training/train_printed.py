@@ -83,22 +83,36 @@ def smoke_train(steps: int, output: Path, charset: str = ENGLISH_CHARSET) -> dic
     return summary
 
 
+def _content_width(text: str) -> int:
+    width = int(render_line(text).shape[1])
+    return width + (4 - width % 4) % 4
+
+
 def _fit(model: PrintedCrnn, texts: list[str], charset: str, steps: int, device: torch.device) -> float | None:
+    """Fit each line at the width inference will use.
+
+    Mixing a short line into a wider batch changes the decode, so lines are
+    grouped by that width before they share a batch.
+    """
+    buckets: dict[int, list[str]] = {}
+    for text in texts:
+        buckets.setdefault(_content_width(text), []).append(text)
     optimiser = torch.optim.Adam(model.parameters(), lr=1e-3)
     last_loss = None
     model.train()
     for _step in range(steps):
-        for start in range(0, len(texts), 8):
-            chunk = texts[start : start + 8]
-            images, targets, lengths = prepare_batch(chunk, charset, device)
-            logits = model(images)
-            loss = ctc_loss(logits, targets, lengths)
-            if not torch.isfinite(loss):
-                raise RuntimeError("CTC loss was not finite")
-            optimiser.zero_grad(set_to_none=True)
-            loss.backward()
-            optimiser.step()
-            last_loss = float(loss.detach().cpu())
+        for bucket in buckets.values():
+            for start in range(0, len(bucket), 8):
+                chunk = bucket[start : start + 8]
+                images, targets, lengths = prepare_batch(chunk, charset, device)
+                logits = model(images)
+                loss = ctc_loss(logits, targets, lengths)
+                if not torch.isfinite(loss):
+                    raise RuntimeError("CTC loss was not finite")
+                optimiser.zero_grad(set_to_none=True)
+                loss.backward()
+                optimiser.step()
+                last_loss = float(loss.detach().cpu())
     return last_loss
 
 
