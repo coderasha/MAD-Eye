@@ -1,0 +1,686 @@
+// MAD-EYE platform schema.
+// Connection URLs live in prisma.config.ts (migrations) and DATABASE_URL (application).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../packages/database/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum MembershipStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum DocumentStatus {
+  UPLOADED
+  QUEUED
+  PROCESSING
+  SUCCEEDED
+  PARTIAL
+  FAILED
+}
+
+enum DocumentSourceKind {
+  UPLOAD
+  API
+}
+
+enum ScanStatus {
+  NOT_SCANNED
+  SKIPPED_NOT_CONFIGURED
+  CLEAN
+  INFECTED
+  SCAN_FAILED
+}
+
+enum AssetKind {
+  ORIGINAL
+  RENDERED_PAGE
+  PREPROCESSED_PAGE
+  BINARIZED_PAGE
+}
+
+enum PageStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum JobStatus {
+  PENDING
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  PARTIAL
+  FAILED
+  CANCELLED
+}
+
+enum StageName {
+  INGEST
+  RENDER
+  PREPROCESS
+  QUALITY
+  SCRIPT
+  DETECT
+  RECOGNISE
+  LAYOUT
+  TABLE
+  CLASSIFY
+  EXTRACT
+  VALIDATE
+  CONFIDENCE
+}
+
+enum StageStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+  NOT_IMPLEMENTED
+}
+
+enum OutputState {
+  RECOGNISED
+  RECOGNISED_WITH_WARNING
+  NEEDS_REVIEW
+  UNREADABLE
+  VALIDATION_FAILED
+}
+
+enum ReviewStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  DISMISSED
+}
+
+enum ModelVersionStatus {
+  CLASSICAL_BASELINE
+  ARCHITECTURE_DEFINED
+  TRAINED
+  EVALUATED
+  REGISTERED
+  RETIRED
+}
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  displayName  String    @map("display_name")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  memberships         Membership[]
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  apiKeys             ApiKey[]
+  corrections         Correction[]
+  assignedReviews     ReviewTask[]     @relation("ReviewAssignee")
+
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model Organization {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String    @unique
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  tenants     Tenant[]
+  memberships Membership[]
+
+  @@map("organizations")
+}
+
+model Tenant {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  name           String
+  slug           String
+  retentionDays  Int       @default(365) @map("retention_days")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  organization      Organization       @relation(fields: [organizationId], references: [id])
+  memberships       Membership[]
+  roles             Role[]
+  documents         Document[]
+  batches           Batch[]
+  jobs              ProcessingJob[]
+  apiKeys           ApiKey[]
+  auditEvents       AuditEvent[]
+  usageRecords      UsageRecord[]
+  webhooks          Webhook[]
+  extractionSchemas ExtractionSchema[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+  @@map("tenants")
+}
+
+model Permission {
+  id          String @id @default(uuid()) @db.Uuid
+  key         String @unique
+  description String
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model Role {
+  id       String  @id @default(uuid()) @db.Uuid
+  tenantId String  @map("tenant_id") @db.Uuid
+  key      String
+  name     String
+  system   Boolean @default(true)
+
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  permissions RolePermission[]
+  memberships Membership[]
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+  @@map("roles")
+}
+
+model RolePermission {
+  roleId       String @map("role_id") @db.Uuid
+  permissionId String @map("permission_id") @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model Membership {
+  id             String           @id @default(uuid()) @db.Uuid
+  userId         String           @map("user_id") @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  tenantId       String           @map("tenant_id") @db.Uuid
+  roleId         String           @map("role_id") @db.Uuid
+  status         MembershipStatus @default(ACTIVE)
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  deletedAt      DateTime?        @map("deleted_at")
+
+  user         User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  tenant       Tenant       @relation(fields: [tenantId], references: [id])
+  role         Role         @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+  @@index([userId])
+  @@map("memberships")
+}
+
+model Document {
+  id           String             @id @default(uuid()) @db.Uuid
+  tenantId     String             @map("tenant_id") @db.Uuid
+  createdById  String?            @map("created_by_id") @db.Uuid
+  filename     String
+  mediaType    String             @map("media_type")
+  byteSize     Int                @map("byte_size")
+  sha256       String
+  status       DocumentStatus     @default(UPLOADED)
+  pageCount    Int?               @map("page_count")
+  sourceKind   DocumentSourceKind @default(UPLOAD) @map("source_kind")
+  scanStatus   ScanStatus         @default(NOT_SCANNED) @map("scan_status")
+  metadata     Json?
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+  deletedAt    DateTime?          @map("deleted_at")
+
+  tenant   Tenant              @relation(fields: [tenantId], references: [id])
+  assets   DocumentAsset[]
+  pages    DocumentPage[]
+  jobs     ProcessingJob[]
+  regions  RecognitionRegion[]
+  fields   ExtractedField[]
+  tables   DocTable[]
+  reviews  ReviewTask[]
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+  @@map("documents")
+}
+
+model DocumentPage {
+  id         String     @id @default(uuid()) @db.Uuid
+  tenantId   String     @map("tenant_id") @db.Uuid
+  documentId String     @map("document_id") @db.Uuid
+  pageIndex  Int        @map("page_index")
+  width      Int?
+  height     Int?
+  dpi        Float?
+  status     PageStatus @default(PENDING)
+  errorCode  String?    @map("error_code")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  document Document            @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  assets   DocumentAsset[]
+  regions  RecognitionRegion[]
+  tables   DocTable[]
+
+  @@unique([documentId, pageIndex])
+  @@index([tenantId, documentId])
+  @@map("document_pages")
+}
+
+model DocumentAsset {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  documentId String    @map("document_id") @db.Uuid
+  pageId     String?   @map("page_id") @db.Uuid
+  kind       AssetKind
+  mediaType  String    @map("media_type")
+  byteSize   Int       @map("byte_size")
+  sha256     String
+  storageKey String    @map("storage_key")
+  version    Int       @default(1)
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  document Document      @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  page     DocumentPage? @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, documentId])
+  @@map("document_assets")
+}
+
+model Batch {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  status    JobStatus @default(PENDING)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  tenant Tenant          @relation(fields: [tenantId], references: [id])
+  jobs   ProcessingJob[]
+
+  @@index([tenantId, createdAt])
+  @@map("batches")
+}
+
+model ProcessingJob {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  documentId     String    @map("document_id") @db.Uuid
+  batchId        String?   @map("batch_id") @db.Uuid
+  idempotencyKey String?   @map("idempotency_key")
+  pipeline       String
+  status         JobStatus @default(PENDING)
+  requestedById  String?   @map("requested_by_id") @db.Uuid
+  correlationId  String    @map("correlation_id")
+  errorCode      String?   @map("error_code")
+  errorMessage   String?   @map("error_message")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  startedAt      DateTime? @map("started_at")
+  finishedAt     DateTime? @map("finished_at")
+
+  tenant     Tenant            @relation(fields: [tenantId], references: [id])
+  document   Document          @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  batch      Batch?            @relation(fields: [batchId], references: [id])
+  stages     ProcessingStage[]
+  executions ModelExecution[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, status, createdAt])
+  @@index([documentId])
+  @@map("processing_jobs")
+}
+
+model ProcessingStage {
+  id         String      @id @default(uuid()) @db.Uuid
+  tenantId   String      @map("tenant_id") @db.Uuid
+  jobId      String      @map("job_id") @db.Uuid
+  name       StageName
+  status     StageStatus
+  detail     Json?
+  startedAt  DateTime?   @map("started_at")
+  finishedAt DateTime?   @map("finished_at")
+
+  job ProcessingJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@map("processing_stages")
+}
+
+model Model {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique
+  name        String
+  family      String
+  task        String
+  description String
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  versions ModelVersion[]
+
+  @@map("models")
+}
+
+model ModelVersion {
+  id                   String             @id @default(uuid()) @db.Uuid
+  modelId              String             @map("model_id") @db.Uuid
+  version              String
+  status               ModelVersionStatus
+  artifactUri          String?            @map("artifact_uri")
+  checksumSha256       String?            @map("checksum_sha256")
+  datasetVersion       String?            @map("dataset_version")
+  license              String             @default("proprietary-unreleased")
+  benchmarkValidated   Boolean            @default(false) @map("benchmark_validated")
+  metrics              Json?
+  config               Json?
+  createdAt            DateTime           @default(now()) @map("created_at")
+
+  model      Model            @relation(fields: [modelId], references: [id])
+  executions ModelExecution[]
+
+  @@unique([modelId, version])
+  @@map("model_versions")
+}
+
+model ModelExecution {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  jobId          String   @map("job_id") @db.Uuid
+  modelVersionId String   @map("model_version_id") @db.Uuid
+  device         String
+  latencyMs      Int?     @map("latency_ms")
+  status         String
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  job          ProcessingJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  modelVersion ModelVersion  @relation(fields: [modelVersionId], references: [id])
+
+  @@index([tenantId, jobId])
+  @@map("model_executions")
+}
+
+model ExtractionSchema {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  key        String
+  name       String
+  version    Int      @default(1)
+  definition Json
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant           @relation(fields: [tenantId], references: [id])
+  fields ExtractedField[]
+
+  @@unique([tenantId, key, version])
+  @@map("extraction_schemas")
+}
+
+model ExtractedField {
+  id          String      @id @default(uuid()) @db.Uuid
+  tenantId    String      @map("tenant_id") @db.Uuid
+  documentId  String      @map("document_id") @db.Uuid
+  jobId       String?     @map("job_id") @db.Uuid
+  schemaId    String?     @map("schema_id") @db.Uuid
+  fieldKey    String      @map("field_key")
+  valueText   String?     @map("value_text")
+  confidence  Float?
+  calibrated  Boolean     @default(false)
+  outputState OutputState @map("output_state")
+  regionId    String?     @map("region_id") @db.Uuid
+  pageIndex   Int?        @map("page_index")
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  document Document          @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  schema   ExtractionSchema? @relation(fields: [schemaId], references: [id])
+  region   RecognitionRegion? @relation(fields: [regionId], references: [id])
+
+  @@index([tenantId, documentId])
+  @@map("extracted_fields")
+}
+
+model RecognitionRegion {
+  id             String      @id @default(uuid()) @db.Uuid
+  tenantId       String      @map("tenant_id") @db.Uuid
+  documentId     String      @map("document_id") @db.Uuid
+  pageId         String      @map("page_id") @db.Uuid
+  jobId          String?     @map("job_id") @db.Uuid
+  regionIndex    Int         @map("region_index")
+  text           String
+  confidence     Float?
+  calibrated     Boolean     @default(false)
+  outputState    OutputState @map("output_state")
+  bbox           Json
+  modelVersionId String?     @map("model_version_id") @db.Uuid
+  configHash     String?     @map("config_hash")
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  document    Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  page        DocumentPage   @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  corrections Correction[]
+  fields      ExtractedField[]
+
+  @@index([tenantId, documentId])
+  @@map("recognition_regions")
+}
+
+/// Named DocTable because Table is a Prisma schema concept in some tooling.
+model DocTable {
+  id         String @id @default(uuid()) @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  documentId String @map("document_id") @db.Uuid
+  pageId     String @map("page_id") @db.Uuid
+  jobId      String? @map("job_id") @db.Uuid
+  bbox       Json
+  rowCount   Int    @map("row_count")
+  colCount   Int    @map("col_count")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  document Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  page     DocumentPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  cells    TableCell[]
+
+  @@index([tenantId, documentId])
+  @@map("tables")
+}
+
+model TableCell {
+  id       String  @id @default(uuid()) @db.Uuid
+  tenantId String  @map("tenant_id") @db.Uuid
+  tableId  String  @map("table_id") @db.Uuid
+  rowIndex Int     @map("row_index")
+  colIndex Int     @map("col_index")
+  rowSpan  Int     @default(1) @map("row_span")
+  colSpan  Int     @default(1) @map("col_span")
+  text     String?
+  regionId String? @map("region_id") @db.Uuid
+  bbox     Json?
+
+  table DocTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  @@index([tableId])
+  @@map("table_cells")
+}
+
+model ValidationResult {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  documentId String   @map("document_id") @db.Uuid
+  jobId      String?  @map("job_id") @db.Uuid
+  fieldId    String?  @map("field_id") @db.Uuid
+  ruleKey    String   @map("rule_key")
+  passed     Boolean
+  message    String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, documentId])
+  @@map("validation_results")
+}
+
+model ReviewTask {
+  id         String       @id @default(uuid()) @db.Uuid
+  tenantId   String       @map("tenant_id") @db.Uuid
+  documentId String       @map("document_id") @db.Uuid
+  jobId      String?      @map("job_id") @db.Uuid
+  reason     String
+  status     ReviewStatus @default(OPEN)
+  assigneeId String?      @map("assignee_id") @db.Uuid
+  createdAt  DateTime     @default(now()) @map("created_at")
+  resolvedAt DateTime?    @map("resolved_at")
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  assignee User?    @relation("ReviewAssignee", fields: [assigneeId], references: [id])
+
+  @@index([tenantId, status])
+  @@map("review_tasks")
+}
+
+model Correction {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  regionId      String?  @map("region_id") @db.Uuid
+  fieldId       String?  @map("field_id") @db.Uuid
+  authorId      String   @map("author_id") @db.Uuid
+  previousText  String   @map("previous_text")
+  correctedText String   @map("corrected_text")
+  reason        String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  region RecognitionRegion? @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  author User               @relation(fields: [authorId], references: [id])
+
+  @@index([tenantId, regionId])
+  @@map("corrections")
+}
+
+model AuditEvent {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String?  @map("tenant_id") @db.Uuid
+  actorId       String?  @map("actor_id") @db.Uuid
+  action        String
+  targetType    String   @map("target_type")
+  targetId      String?  @map("target_id") @db.Uuid
+  correlationId String?  @map("correlation_id")
+  metadata      Json?
+  ip            String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@map("audit_events")
+}
+
+model Webhook {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  url             String
+  secretEncrypted String   @map("secret_encrypted")
+  events          String[]
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  tenant     Tenant            @relation(fields: [tenantId], references: [id])
+  deliveries WebhookDelivery[]
+
+  @@index([tenantId])
+  @@map("webhooks")
+}
+
+model WebhookDelivery {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  webhookId   String    @map("webhook_id") @db.Uuid
+  event       String
+  payload     Json
+  attempt     Int
+  statusCode  Int?      @map("status_code")
+  succeeded   Boolean   @default(false)
+  nextRetryAt DateTime? @map("next_retry_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@map("webhook_deliveries")
+}
+
+model UsageRecord {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  metric     String
+  quantity   Int
+  occurredAt DateTime @default(now()) @map("occurred_at")
+  jobId      String?  @map("job_id") @db.Uuid
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, metric, occurredAt])
+  @@map("usage_records")
+}
+
+model ApiKey {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String
+  prefix      String
+  hash        String    @unique
+  permissions String[]
+  createdById String    @map("created_by_id") @db.Uuid
+  lastUsedAt  DateTime? @map("last_used_at")
+  expiresAt   DateTime? @map("expires_at")
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  createdBy User   @relation(fields: [createdById], references: [id])
+
+  @@index([tenantId])
+  @@index([prefix])
+  @@map("api_keys")
+}

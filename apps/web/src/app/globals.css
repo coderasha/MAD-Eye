@@ -1,0 +1,23 @@
+@import "tailwindcss";
+@source "../../../../packages/ui/src";
+
+@theme {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Source Serif 4", ui-serif, Georgia, serif;
+  --color-paper: #f3efe4;
+  --color-ink: #1b1914;
+  --color-copper: #9a3412;
+  --color-line: #e4dccb;
+  --color-panel: #fffcf6;
+  --color-moss: #3f4f3a;
+}
+
+html {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+body {
+  min-height: 100vh;
+  font-family: var(--font-sans);
+}

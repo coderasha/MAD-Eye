@@ -1,0 +1,51 @@
+{
+  "contractVersion": "1.0.0",
+  "inputSha256": "abc123",
+  "mediaType": "image/png",
+  "pageCount": 1,
+  "pages": [
+    {
+      "pageIndex": 0,
+      "status": "COMPLETED",
+      "dpi": 200,
+      "quality": {
+        "blurVariance": 12.5,
+        "blurLevel": "blurry",
+        "noiseScore": 1.2,
+        "noiseLevel": "low",
+        "skewDegrees": 0.2,
+        "contrastStd": 40,
+        "shadowScore": 3,
+        "width": 32,
+        "height": 32,
+        "dpi": 200,
+        "resolutionAssessment": "unknown",
+        "orientationDegrees": 0,
+        "orientationConfidence": 0.4,
+        "upsideDownResolved": false,
+        "degradationFlags": ["blur"]
+      },
+      "plan": {
+        "operations": ["grayscale"],
+        "skipped": ["denoise"],
+        "reasons": { "denoise": "noise below the action threshold" }
+      },
+      "output": {
+        "primaryPngBase64": "aGk=",
+        "primarySha256": "def456",
+        "width": 32,
+        "height": 32,
+        "derivatives": []
+      },
+      "provenance": {
+        "component": "preprocessing",
+        "version": "0.1.0",
+        "modelCode": null,
+        "modelVersion": null,
+        "benchmarkValidated": false
+      },
+      "errorCode": null
+    }
+  ],
+  "errors": []
+}

@@ -1,0 +1,12 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: madeye-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["api:3001"]
+  - job_name: madeye-intelligence
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["intelligence:8000"]

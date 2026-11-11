@@ -1,0 +1,10 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+onlyBuiltDependencies:
+  - "@prisma/engines"
+  - "@scarf/scarf"
+  - esbuild
+  - prisma
+  - "@node-rs/argon2"

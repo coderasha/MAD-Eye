@@ -1,0 +1,16 @@
+# ME-04 English printed recognition. This file does not point at a dataset.
+architecture: me04_crnn_v1
+family: ME-04
+language: eng
+script: Latn
+image_height: 32
+blank_index: 0
+optimizer:
+  name: adam
+  learning_rate: 0.001
+smoke:
+  enabled_only_with_cli_flag: true
+  dataset: synthetic_smoke
+  benchmark_validated: false
+held_out:
+  readable_by_trainer: false

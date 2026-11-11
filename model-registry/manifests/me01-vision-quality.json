@@ -1,0 +1,14 @@
+{
+  "modelCode": "me-01-vision-quality",
+  "family": "ME-01",
+  "version": "0.1.0-classical",
+  "status": "classical_baseline",
+  "architecture": "deterministic-opencv-measures",
+  "weightsPath": null,
+  "weightsSha256": null,
+  "datasetVersion": null,
+  "license": "proprietary-unreleased",
+  "benchmarkValidated": false,
+  "metrics": null,
+  "notes": "Classical measurements only. The orientation target of 99.5% has not been measured."
+}

@@ -1,0 +1,10 @@
+node_modules
+.venv
+.git
+.next
+**/dist
+packages/database/generated
+model-factory/experiments
+**/.pytest_cache
+**/*.pt
+.env

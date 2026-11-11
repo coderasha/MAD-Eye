@@ -1,0 +1,14 @@
+{
+  "modelCode": "me-04-printed-recognition",
+  "family": "ME-04",
+  "version": "0.1.0-untrained",
+  "status": "architecture_defined",
+  "architecture": "me04_crnn_v1",
+  "weightsPath": null,
+  "weightsSha256": null,
+  "datasetVersion": null,
+  "license": "proprietary-unreleased",
+  "benchmarkValidated": false,
+  "metrics": null,
+  "notes": "Training code exists. No production weights. No accuracy claim."
+}
